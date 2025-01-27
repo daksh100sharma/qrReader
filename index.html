@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Reader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #f4f4f4;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    video {
+      width: 100%;
+      max-width: 400px;
+      border: 2px solid #333;
+      border-radius: 10px;
+    }
+    canvas {
+      display: none;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: #fff;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #output {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>QR Code Reader</h1>
+  <video id="video" autoplay></video>
+  <canvas id="canvas"></canvas>
+  <button id="switchCamera">Switch Camera</button>
+  <p id="output">Point your camera at a QR code.</p>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr"></script>
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const output = document.getElementById('output');
+    const switchCameraButton = document.getElementById('switchCamera');
+
+    let currentStream = null;
+    let useBackCamera = true; // Default to back camera
+
+    async function startCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        output.textContent = 'Camera access is not supported on this browser.';
+        return;
+      }
+
+      try {
+        const constraints = {
+          video: {
+            facingMode: useBackCamera ? 'environment' : 'user'
+          }
+        };
+
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+        video.play();
+      } catch (error) {
+        handleCameraError(error);
+      }
+    }
+
+    function handleCameraError(error) {
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        output.textContent = 'Camera access is restricted on non-secure origins. Please use HTTPS or localhost.';
+      } else {
+        output.textContent = `Error accessing the camera: ${error.message}`;
+      }
+    }
+
+    function scanQRCode() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code) {
+          output.textContent = 'QR Code Data: ' + code.data;
+        } else {
+          output.textContent = 'No QR code detected. Keep scanning...';
+        }
+      }
+
+      requestAnimationFrame(scanQRCode);
+    }
+
+    switchCameraButton.addEventListener('click', () => {
+      useBackCamera = !useBackCamera;
+      startCamera();
+    });
+
+    startCamera();
+    scanQRCode();
+  </script>
+</body>
+</html>
